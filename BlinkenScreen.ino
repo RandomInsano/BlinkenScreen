@@ -119,17 +119,19 @@ char read_buttons()
   return val;
 }
 
-inline void animation_wipe() {
-  static uint64_t i = 0;
+void animation_wipe() {
+  animation_raw_wipe();
   
-  i = i == 0 ? 1 : i << 1;
-
-  s.i = massage(i);
+  s.i = massage(s.i);
 }
 
-inline void animation_raw_wipe() {
+void animation_raw_wipe() {
+  static uint64_t i = 0;
+
   // Show single pixel walking across the display
-  s.i = s.i == 0 ? 1 : s.i << 1;
+  i = i == 0 ? 1 : i << 1;
+
+  s.i = i;
 }
 
 inline void animation_bump() {
