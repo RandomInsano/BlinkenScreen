@@ -55,6 +55,12 @@ const uint64_t conversion_table[] = {
   0x00
 };
 
+enum modes {
+  RAW_WIPE,
+  WIPE,
+  MODE_SENTINAL
+};
+
 screen s;
 
 uint64_t massage(uint64_t data) {
@@ -73,8 +79,7 @@ uint64_t massage(uint64_t data) {
     }
   }
   
-  // Reverse since LED logic is inverted
-  return ~scratch;
+  return scratch;
 }
 
 void setup() {
@@ -111,23 +116,55 @@ char read_buttons()
   return val;
 }
 
-char mode = 0;
-void loop() {
-  s.i = 1;
-  mode ^= 1;
-  screen temp;
-
-  while (s.i != 0) {
-    // Translate or not
-    temp.i = mode ? ~s.i : massage(s.i);
-    
-    SPI.beginTransaction(spi_settings);
-    SPI.transfer(temp.b, BUFFER_SIZE);
-    SPI.endTransaction();
+inline void wipe() {
+  static uint64_t i = 0;
   
-    s.i = s.i << 1;
+  i = i == 0 ? 1 : i << 1;
+
+  s.i = massage(i);
+}
+
+inline void raw_wipe() {
+  // Show single pixel walking across the display
+  s.i = s.i == 0 ? 1 : s.i << 1;
+}
+
+// NOTE: We want to pass a copy because SPI.transfer is destructive
+int print_framebuffer(union screen framebuffer) {
+  // Screen is active low, so modify before pushing it out  
+  framebuffer.i = ~framebuffer.i;
+
+  SPI.beginTransaction(spi_settings);
+  SPI.transfer(framebuffer.b, BUFFER_SIZE);
+  SPI.endTransaction();
+}
+
+// Unsigned allows us to modulo to correct value on overflow
+unsigned char mode = WIPE;
+void loop() {
+  char button = read_buttons();
+
+  switch (mode)
+  {
+    case RAW_WIPE:
+      raw_wipe();
+      break;
       
-    delay(80);
-    Serial.println((int)read_buttons());
+    case WIPE:
+      wipe();
+      break;
+
+    // Outside range, correct it
+    default:
+      mode %= MODE_SENTINAL;
   }
+  
+  print_framebuffer(s);
+
+  delay(10);
+  
+  if (button == B1)
+    mode++;
+  else if (button == B2)
+    mode--;
 }
