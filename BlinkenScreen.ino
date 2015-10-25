@@ -161,7 +161,7 @@ int print_framebuffer(union screen framebuffer) {
 }
 
 // Unsigned allows us to modulo to correct value on overflow
-unsigned char mode = BUMP;
+unsigned char mode = RAW_WIPE;
 void loop() {
   char button;
 
@@ -175,11 +175,11 @@ void loop() {
 
   switch (button) {
     case B1:
-      mode++;
+      mode--;
       break;
       
     case B2:
-      mode--;
+      mode++;
       break;
   }
 
