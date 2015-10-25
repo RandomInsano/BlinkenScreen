@@ -20,6 +20,16 @@ typedef union screen {
   uint64_t i;
 };
 
+enum modes {
+  RAW_WIPE,
+  WIPE,
+  BUMP,
+  MODE_SENTINAL
+};
+
+
+screen s;
+
 const uint64_t conversion_table[] = {
   // Row 1
   0x000010000000,
@@ -54,14 +64,6 @@ const uint64_t conversion_table[] = {
   // Sentinal
   0x00
 };
-
-enum modes {
-  RAW_WIPE,
-  WIPE,
-  MODE_SENTINAL
-};
-
-screen s;
 
 uint64_t massage(uint64_t data) {
   uint64_t scratch = 0;
@@ -116,7 +118,7 @@ char read_buttons()
   return val;
 }
 
-inline void wipe() {
+inline void animation_wipe() {
   static uint64_t i = 0;
   
   i = i == 0 ? 1 : i << 1;
@@ -124,9 +126,27 @@ inline void wipe() {
   s.i = massage(i);
 }
 
-inline void raw_wipe() {
+inline void animation_raw_wipe() {
   // Show single pixel walking across the display
   s.i = s.i == 0 ? 1 : s.i << 1;
+}
+
+inline void animation_bump() {
+  static unsigned char i = 64;
+  static unsigned char dir = 0;
+
+  i = dir == 0 ? i >> 1 : i << 1;
+
+  if (i == 1 || i == 128)
+    dir ^= 1;
+
+  s.b[0] = i;
+  s.b[1] = i;
+  s.b[2] = i;
+  s.b[3] = i;
+  s.b[4] = i;
+  s.b[5] = i;  
+  s.i = massage(s.i);
 }
 
 // NOTE: We want to pass a copy because SPI.transfer is destructive
@@ -140,18 +160,28 @@ int print_framebuffer(union screen framebuffer) {
 }
 
 // Unsigned allows us to modulo to correct value on overflow
-unsigned char mode = WIPE;
+unsigned char mode = BUMP;
 void loop() {
-  char button = read_buttons();
+  char button;
+
+  // TODO: Account for processing time in delay
+  for (int i = 0; i < 50; i++) {
+    button = read_buttons();
+    delay(10);
+  }
 
   switch (mode)
   {
     case RAW_WIPE:
-      raw_wipe();
+      animation_raw_wipe();
       break;
       
     case WIPE:
-      wipe();
+      animation_wipe();
+      break;
+
+    case BUMP:
+      animation_bump();
       break;
 
     // Outside range, correct it
@@ -160,8 +190,6 @@ void loop() {
   }
   
   print_framebuffer(s);
-
-  delay(10);
   
   if (button == B1)
     mode++;
