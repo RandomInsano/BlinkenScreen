@@ -74,7 +74,7 @@ uint64_t massage(uint64_t data) {
     scratch >>= 24;
     
     // Loop over the half display
-    for (char i = 0; i <= 24; i++) {
+    for (char i = 0; i < 24; i++) {
       if (data & 1) {
         scratch |= conversion_table[i];
       }
