@@ -2,7 +2,18 @@
 
 SPISettings spi_settings(2000, LSBFIRST, SPI_MODE0); 
 
-const int BUFFER_SIZE = 6;
+#define BUFFER_SIZE 6   // Size of screen frame buffer
+#define BUTTON_PIN  7   // Analog pin 7
+#define BUTTON_THRESHOLD 5 // How many cycles before button considered pressed
+
+// Buttons
+#define BIDLE 10 // Nothing pressed
+#define B1 5
+#define B2 4
+#define B3 3
+#define B4 7
+#define B5 2
+#define B6 0
 
 typedef union screen {
   char b[BUFFER_SIZE];
@@ -67,12 +78,39 @@ uint64_t massage(uint64_t data) {
 }
 
 void setup() {
-//  Serial.begin(9600);
+  Serial.begin(115200);
   SPI.begin();
   
   s.i = 0;
 }
-  
+
+char button_last;
+char button_confidence = 0;
+char read_buttons()
+{
+  char val = analogRead(BUTTON_PIN) / 100; // Analog values are in the hundreds
+
+  // Keep track of how many loops we've been the
+  // same value
+  if (val == button_last) {
+    if (button_confidence <= BUTTON_THRESHOLD) {
+      button_confidence++;
+    }
+  } else {
+    button_confidence = 0;
+    button_last = val;
+    return 0;
+  }
+
+  // Only consider a button pressed if we've
+  // seen the same value for five loops
+  if (button_confidence != 5) {
+    return 0;
+  }
+
+  return val;
+}
+
 char mode = 0;
 void loop() {
   s.i = 1;
@@ -90,5 +128,6 @@ void loop() {
     s.i = s.i << 1;
       
     delay(80);
+    Serial.println((int)read_buttons());
   }
 }
