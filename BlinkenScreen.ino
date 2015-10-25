@@ -165,13 +165,26 @@ void loop() {
   char button;
 
   // TODO: Account for processing time in delay
-  for (int i = 0; i < 50; i++) {
-    button = read_buttons();
+  button = 0;
+  for (int i = 0; i < 5; i++) {
+    if (button == 0)
+      button = read_buttons();
     delay(10);
   }
 
-  switch (mode)
-  {
+  switch (button) {
+    case B1:
+      mode++;
+      break;
+      
+    case B2:
+      mode--;
+      break;
+  }
+
+  Serial.println((int)mode);
+
+  switch (mode) {
     case RAW_WIPE:
       animation_raw_wipe();
       break;
@@ -190,9 +203,4 @@ void loop() {
   }
   
   print_framebuffer(s);
-  
-  if (button == B1)
-    mode++;
-  else if (button == B2)
-    mode--;
 }
