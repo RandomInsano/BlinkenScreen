@@ -21,10 +21,11 @@ typedef union screen {
 };
 
 enum modes {
+  MODE_SENTINAL_L,
   RAW_WIPE,
   WIPE,
   BUMP,
-  MODE_SENTINAL
+  MODE_SENTINAL_H
 };
 
 
@@ -198,8 +199,13 @@ void loop() {
       break;
 
     // Outside range, correct it
-    default:
-      mode %= MODE_SENTINAL;
+    case MODE_SENTINAL_H:
+      mode = MODE_SENTINAL_L + 1;
+      break;
+      
+    case MODE_SENTINAL_L:
+      mode = MODE_SENTINAL_H - 1;
+      break;
   }
   
   print_framebuffer(s);
