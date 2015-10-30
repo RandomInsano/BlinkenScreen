@@ -2,12 +2,34 @@
 
 SPISettings spi_settings(2000, LSBFIRST, SPI_MODE0); 
 
-const int BUFFER_SIZE = 6;
+#define BUFFER_SIZE 6   // Size of screen frame buffer
+#define BUTTON_PIN  7   // Analog pin 7
+#define BUTTON_THRESHOLD 5 // How many cycles before button considered pressed
+
+// Buttons
+#define BIDLE 10 // Nothing pressed
+#define B1 5
+#define B2 4
+#define B3 3
+#define B4 7
+#define B5 2
+#define B6 0
 
 typedef union screen {
   char b[BUFFER_SIZE];
   uint64_t i;
 };
+
+enum modes {
+  MODE_SENTINAL_L,
+  RAW_WIPE,
+  WIPE,
+  BUMP,
+  MODE_SENTINAL_H
+};
+
+
+screen s;
 
 const uint64_t conversion_table[] = {
   // Row 1
@@ -44,8 +66,6 @@ const uint64_t conversion_table[] = {
   0x00
 };
 
-screen s;
-
 uint64_t massage(uint64_t data) {
   uint64_t scratch = 0;
   
@@ -54,7 +74,7 @@ uint64_t massage(uint64_t data) {
     scratch >>= 24;
     
     // Loop over the half display
-    for (char i = 0; i <= 24; i++) {
+    for (char i = 0; i < 24; i++) {
       if (data & 1) {
         scratch |= conversion_table[i];
       }
@@ -62,33 +82,133 @@ uint64_t massage(uint64_t data) {
     }
   }
   
-  // Reverse since LED logic is inverted
-  return ~scratch;
+  return scratch;
 }
 
 void setup() {
-//  Serial.begin(9600);
+  Serial.begin(115200);
   SPI.begin();
   
   s.i = 0;
 }
-  
-char mode = 0;
-void loop() {
-  s.i = 1;
-  mode ^= 1;
-  screen temp;
 
-  while (s.i != 0) {
-    // Translate or not
-    temp.i = mode ? ~s.i : massage(s.i);
-    
-    SPI.beginTransaction(spi_settings);
-    SPI.transfer(temp.b, BUFFER_SIZE);
-    SPI.endTransaction();
-  
-    s.i = s.i << 1;
-      
-    delay(80);
+char button_last;
+char button_confidence = 0;
+char read_buttons()
+{
+  char val = analogRead(BUTTON_PIN) / 100; // Analog values are in the hundreds
+
+  // Keep track of how many loops we've been the
+  // same value
+  if (val == button_last) {
+    if (button_confidence <= BUTTON_THRESHOLD) {
+      button_confidence++;
+    }
+  } else {
+    button_confidence = 0;
+    button_last = val;
+    return 0;
   }
+
+  // Only consider a button pressed if we've
+  // seen the same value for five loops
+  if (button_confidence != 5) {
+    return 0;
+  }
+
+  return val;
+}
+
+void animation_wipe() {
+  animation_raw_wipe();
+  
+  s.i = massage(s.i);
+}
+
+void animation_raw_wipe() {
+  static uint64_t i = 0;
+
+  // Show single pixel walking across the display
+  i = i == 0 ? 1 : i << 1;
+
+  s.i = i;
+}
+
+inline void animation_bump() {
+  static unsigned char i = 64;
+  static unsigned char dir = 0;
+
+  i = dir == 0 ? i >> 1 : i << 1;
+
+  if (i == 1 || i == 128)
+    dir ^= 1;
+
+  s.b[0] = i;
+  s.b[1] = i;
+  s.b[2] = i;
+  s.b[3] = i;
+  s.b[4] = i;
+  s.b[5] = i;  
+  s.i = massage(s.i);
+}
+
+// NOTE: We want to pass a copy because SPI.transfer is destructive
+int print_framebuffer(union screen framebuffer) {
+  // Screen is active low, so modify before pushing it out  
+  framebuffer.i = ~framebuffer.i;
+
+  SPI.beginTransaction(spi_settings);
+  SPI.transfer(framebuffer.b, BUFFER_SIZE);
+  SPI.endTransaction();
+}
+
+// Unsigned allows us to modulo to correct value on overflow
+unsigned char mode = RAW_WIPE;
+void loop() {
+  char button;
+
+  // TODO: Account for processing time in delay
+  button = 0;
+  for (int i = 0; i < 5; i++) {
+    if (button == 0)
+      button = read_buttons();
+    delay(10);
+  }
+
+  switch (button) {
+    case B1:
+      mode--;
+      break;
+      
+    case B2:
+      mode++;
+      break;
+  }
+
+  Serial.println((int)mode);
+
+  switch (mode) {
+    case RAW_WIPE:
+      animation_raw_wipe();
+      break;
+      
+    case WIPE:
+      animation_wipe();
+      break;
+
+    case BUMP:
+      animation_bump();
+      break;
+
+    // Outside range, correct it
+    case MODE_SENTINAL_H:
+      mode = MODE_SENTINAL_L + 1;
+      break;
+      
+    case MODE_SENTINAL_L:
+      mode = MODE_SENTINAL_H - 1;
+      break;
+  }
+  
+  print_framebuffer(s);
 }
