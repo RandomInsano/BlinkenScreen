@@ -141,7 +141,7 @@ void animation_pong(char button) {
   s.b[3] = s.b[4] = s.b[5] = button == B4 ? 0x01 : 0x00;
   
   // Test ball collision with paddle, volley if good
-  if (s.b[0] == ball || s.b[5] == ball)
+  if (s.b[1] == ball || s.b[4] == ball)
     dir ^= 1;
   
   // Draw the ball
