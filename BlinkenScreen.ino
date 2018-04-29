@@ -25,6 +25,7 @@ enum modes {
   RAW_WIPE,
   WIPE,
   BUMP,
+  PONG,
   MODE_SENTINAL_H
 };
 
@@ -119,6 +120,38 @@ char read_buttons()
   return val;
 }
 
+
+void animation_pong(char button) {
+  static uint16_t ball = 0x00F0;
+  static unsigned char dir = 0;
+  
+  // Reset ball with button #5
+  if (button == B5)
+    ball = 0x00F0;
+    
+  // Move ball
+  if (dir)
+    ball >>= 1;
+  else
+    ball <<= 1;
+    
+  
+  // Draw paddles or blank the feild
+  s.b[0] = s.b[1] = s.b[2] = button == B3 ? 0xF0 : 0x00;
+  s.b[3] = s.b[4] = s.b[5] = button == B4 ? 0x01 : 0x00;
+  
+  // Test ball collision with paddle, volley if good
+  if (s.b[1] == ball || s.b[4] == ball)
+    dir ^= 1;
+  
+  // Draw the ball
+  s.b[1] |= ball >> 8; // Left
+  s.b[4] |= ball;      // Right
+  
+  s.i = massage(s.i);
+}
+
+
 void animation_wipe() {
   animation_raw_wipe();
   
@@ -185,8 +218,6 @@ void loop() {
       break;
   }
 
-  Serial.println((int)mode);
-
   switch (mode) {
     case RAW_WIPE:
       animation_raw_wipe();
@@ -198,6 +229,10 @@ void loop() {
 
     case BUMP:
       animation_bump();
+      break;
+
+    case PONG:
+      animation_pong(button);
       break;
 
     // Outside range, correct it
